@@ -1,18 +1,20 @@
 library flutter_launcher_name;
 
 import 'dart:io';
-
+import 'package:args/args.dart';
 import 'package:flutter_launcher_name/android.dart' as android;
 import 'package:flutter_launcher_name/constants.dart' as constants;
 import 'package:flutter_launcher_name/ios.dart' as ios;
 import 'package:yaml/yaml.dart';
+const String fileOption = 'file';
+const String defaultConfigFile = 'pubspec.yaml';
 
-exec() {
-  print('start');
+exec(List<String> arguments) {
+  final ArgParser parser = ArgParser(allowTrailingOptions: true);
+  parser.addOption(fileOption, abbr: 'f', help: 'Config file (default: $defaultConfigFile)');
+  final ArgResults argResults = parser.parse(arguments);
 
-  final config = loadConfigFile();
-
-  final newName = config['name'];
+  final newName = loadConfigFileFromArgResults(argResults)['name'];
 
   android.overwriteAndroidManifest(newName);
   ios.overwriteInfoPlist(newName);
@@ -20,8 +22,35 @@ exec() {
   print('exit');
 }
 
-Map<String, dynamic> loadConfigFile() {
-  final File file = File('pubspec.yaml');
+Map<String, dynamic> loadConfigFileFromArgResults(ArgResults argResults) {
+  final String configFile = argResults[fileOption];
+
+  if (configFile != null && configFile != defaultConfigFile) {
+    try {
+      return loadConfigFile(configFile);
+    } catch (e) {
+      stderr.writeln(e);
+
+      return null;
+    }
+  }
+
+  try {
+    return loadConfigFile(defaultConfigFile);
+  } catch (e) {
+    if (configFile == null) {
+      try {
+        return loadConfigFile('pubspec.yaml');
+      } catch (_) {}
+    }
+
+  }
+
+  return null;
+}
+
+Map<String, dynamic> loadConfigFile(configFile) {
+  final File file = File(configFile);
   final String yamlString = file.readAsStringSync();
   final Map yamlMap = loadYaml(yamlString);
 
